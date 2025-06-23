@@ -24,7 +24,7 @@ const FirebaseContext = createContext(null);
 const convertUnits = (value, fromUnit, toUnit) => {
   const unitMap = {
     'g': 1, 'ml': 1, // Base units
-    'unidad': 1, 'porción': 1, // Treat as base for now, can be customized later
+    'unidad': 1, // Treat as base for now, can be customized later
     'kg': 1000, // 1 kg = 1000 g
     'lt': 1000  // 1 lt = 1000 ml
   };
@@ -36,7 +36,7 @@ const convertUnits = (value, fromUnit, toUnit) => {
   // Handle incompatible types (e.g., g to lt directly)
   const isMass = ['g', 'kg'].includes(fromUnit) && ['g', 'kg'].includes(toUnit);
   const isVolume = ['ml', 'lt'].includes(fromUnit) && ['ml', 'lt'].includes(toUnit);
-  const isCount = ['unidad', 'porción'].includes(fromUnit) && ['unidad', 'porción'].includes(toUnit);
+  const isCount = ['unidad'].includes(fromUnit) && ['unidad'].includes(toUnit); 
 
   if (!isMass && !isVolume && !isCount) {
     console.warn(`Attempting incompatible unit conversion: ${fromUnit} to ${toUnit}`);
@@ -66,8 +66,8 @@ const App = () => {
     try {
       // *******************************************************************
       // IMPORTANTE: CONFIGURACIÓN DE FIREBASE
-      // PARA DESPLEGAR EN NETLIFY: Estas líneas deben estar DESCOMENTADAS.
-      // Asegúrate de configurar las variables de entorno en Netlify.
+      // Asegúrate de que estas variables de entorno estén configuradas en Netlify/Vercel
+      // Y en tu archivo .env.local para desarrollo local.
       // *******************************************************************
       
       const firebaseConfig = {
@@ -85,7 +85,7 @@ const App = () => {
 
 
       if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
-        const errorMessage = "Las variables de entorno de Firebase no están configuradas correctamente. Por favor, verifica tu archivo .env.local (para desarrollo local) o las variables de entorno en Netlify (para el despliegue).";
+        const errorMessage = "Las variables de entorno de Firebase no están configuradas correctamente. Por favor, verifica tu archivo .env.local (para desarrollo local) o las variables de entorno en tu plataforma de despliegue.";
         console.error(errorMessage);
         setInitializationError(errorMessage);
         setIsAuthReady(true); 
@@ -171,7 +171,7 @@ const App = () => {
           <p>Por favor, revisa:</p>
           <ul className="list-disc list-inside text-left mx-auto max-w-md">
             <li>La configuración de tu proyecto en la Consola de Firebase (especialmente la habilitación del proveedor de Google en Authentication &gt; Sign-in method).</li>
-            <li>**Los dominios autorizados para OAuth en la Consola de Firebase.**</li>
+            <li>**Los dominios autorizados para OAuth en la Consola de Firebase y en Google Cloud Platform.**</li>
             <li>Tu archivo `.env.local` (si estás en desarrollo local y usando `process.env`).</li>
             <li>Las reglas de seguridad de Firestore en Firebase.</li>
           </ul>
@@ -182,17 +182,22 @@ const App = () => {
   }
 
   // currentAppId para el despliegue con process.env
-  const currentAppId = process.env.REACT_APP_FIREBASE_PROJECT_ID || "inventariocookiesandcake";
+  const currentAppId = process.env.REACT_APP_FIREBASE_PROJECT_ID || "mrp-final-app";
 
   const NavBar = ({ setCurrentPage, user, handleGoogleSignIn, handleSignOut }) => (
     <nav className="bg-gradient-to-r from-pink-300 to-rose-200 p-4 shadow-lg rounded-b-3xl mb-6">
       <div className="container mx-auto flex flex-wrap justify-between items-center">
-        {/* Título como botón para ir al Dashboard */}
+        {/* Título con logo */}
         <button 
           onClick={() => setCurrentPage('dashboard')}
           className="text-3xl font-extrabold text-pink-900 tracking-wide flex items-center focus:outline-none hover:opacity-80 transition-opacity duration-200"
         >
-          🍪🍰 Cookies and Cake
+          <img
+            src="/logo_cyc.jpg" // Ahora apunta a tu logo en la carpeta public
+            alt="Logo Pyme Cookies and Cakes" // Alt text actualizado
+            className="h-10 w-10 mr-2 rounded-full shadow-md" // Estilos para el logo
+          />
+          Cookies and Cakes
         </button>
         <div className="flex space-x-2 sm:space-x-4 mt-2 sm:mt-0 items-center">
           {user ? ( 
@@ -234,7 +239,7 @@ const App = () => {
     if (!user) {
       return (
         <div className="bg-white p-10 rounded-2xl shadow-xl border border-pink-100 text-center flex flex-col items-center justify-center min-h-[400px]">
-          <h2 className="text-4xl font-extrabold text-pink-800 mb-6">¡Bienvenido a Cookies and Cake! 🍪🍰</h2>
+          <h2 className="text-4xl font-extrabold text-pink-800 mb-6">¡Bienvenido a Cookies and Cakes!</h2>
           <p className="text-xl text-gray-700 mb-8">
             Por favor, inicia sesión con tu cuenta de Gmail para acceder a tu sistema de inventario y MRP.
           </p>
@@ -309,7 +314,7 @@ const Dashboard = () => {
 
   return (
     <div className="bg-white p-8 rounded-3xl shadow-2xl border border-pink-100">
-      <h2 className="text-4xl font-extrabold text-pink-800 mb-8 text-center">Resumen de Cookies and Cake 🍪🍰</h2>
+      <h2 className="text-4xl font-extrabold text-pink-800 mb-8 text-center">RPM de Cookies and Cakes</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <StatCard title="Total Recetas" value={recipesCount} icon="📝" bgColor="bg-pink-300" textColor="text-pink-900" />
         <StatCard title="Items en Inventario" value={inventoryCount} icon="📦" bgColor="bg-rose-200" textColor="text-rose-900" />
@@ -341,8 +346,8 @@ const Inventory = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
-  // Opciones de unidades
-  const unitOptions = ['g', 'kg', 'lt', 'ml', 'unidad', 'porción'];
+  // Opciones de unidades (se quitó 'porción')
+  const unitOptions = ['g', 'kg', 'lt', 'ml', 'unidad'];
 
   useEffect(() => {
     if (!db || !userId) return;
@@ -536,7 +541,7 @@ const Inventory = () => {
       </div>
 
       {/* Tabla de Inventario de Materias Primas */}
-      <h3 className="text-2xl font-extrabold text-pink-800 mb-5 text-center">Inventario de Materias Primas �🥚</h3>
+      <h3 className="text-2xl font-extrabold text-pink-800 mb-5 text-center">Inventario de Materias Primas 🌾🥚</h3>
       {rawMaterials.length === 0 ? (
         <p className="text-center text-gray-600 text-lg">No hay materias primas registradas. ¡Añade algunas!</p>
       ) : (
@@ -666,16 +671,14 @@ const Recipes = () => {
   const [modalMessage, setModalMessage] = useState('');
   const [productionQuantity, setProductionQuantity] = useState(1); // Cantidad a producir de una receta
 
-  // Opciones de unidades
-  const unitOptions = ['g', 'kg', 'lt', 'ml', 'unidad', 'porción'];
-  // Opciones de tipo de producto para recetas
+  // Opciones de unidades (se quitó 'porción')
+  const unitOptions = ['g', 'kg', 'lt', 'ml', 'unidad'];
+  // Opciones de tipo de producto para recetas (se quitó 'pie' y 'other')
   const recipeTypeOptions = [
     { value: 'cookie', label: 'Galleta 🍪' },
     { value: 'cake', label: 'Torta 🎂' },
-    { value: 'pie', label: 'Pie 🥧' },
     { value: 'reposteria', label: 'Repostería 🧁' },
-    { value: 'personalizados', label: 'Personalizados ✨' },
-    { value: 'other', label: 'Otro ✨' }
+    { value: 'personalizados', label: 'Personalizados ✨' }
   ];
 
   useEffect(() => {
@@ -900,7 +903,7 @@ const Recipes = () => {
         updatedInventoryPromises.push(addDoc(inventoryRef, {
           name: recipe.name,
           unit_value: 1, // Por defecto, 1 unidad del producto terminado
-          unit_type: recipe.type === 'cookie' ? 'unidad' : 'porción', 
+          unit_type: 'unidad', // 'porción' eliminada, se usa 'unidad'
           stock: quantityToProduce,
           type: 'finished_good',
           createdAt: new Date(),
@@ -932,7 +935,7 @@ const Recipes = () => {
               className="w-full p-3 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400"
               value={newRecipeName}
               onChange={(e) => setNewRecipeName(e.target.value)}
-              placeholder="Ej: Pie de Limón, Galletas de Chispas"
+              placeholder="Ej: Galletas de Chispas"
             />
           </div>
           <div>
@@ -1039,8 +1042,9 @@ const Recipes = () => {
           {recipes.map((recipe) => (
             <div key={recipe.id} className="bg-white p-6 rounded-3xl shadow-lg border border-pink-100 flex flex-col justify-between transform hover:scale-103 transition duration-300">
               <div>
-                <h4 className="text-xl font-bold text-pink-700 mb-2">{recipe.name} ({recipe.type === 'cookie' ? '🍪' : recipe.type === 'cake' ? '🎂' : recipe.type === 'pie' ? '🥧' : recipe.type === 'reposteria' ? '🧁' : recipe.type === 'personalizados' ? '✨' : '✨'})</h4>
-                <p className="text-gray-600 mb-3 text-sm">Tipo: <span className="font-semibold capitalize">{recipe.type === 'cookie' ? 'Galleta' : recipe.type === 'cake' ? 'Torta' : recipe.type === 'pie' ? 'Pie' : recipe.type === 'reposteria' ? 'Repostería' : recipe.type === 'personalizados' ? 'Personalizados' : recipe.type}</span></p>
+                {/* Ajuste de emojis según las nuevas opciones de tipo */}
+                <h4 className="text-xl font-bold text-pink-700 mb-2">{recipe.name} ({recipe.type === 'cookie' ? '🍪' : recipe.type === 'cake' ? '🎂' : recipe.type === 'reposteria' ? '🧁' : recipe.type === 'personalizados' ? '✨' : ''})</h4>
+                <p className="text-gray-600 mb-3 text-sm">Tipo: <span className="font-semibold capitalize">{recipe.type === 'cookie' ? 'Galleta' : recipe.type === 'cake' ? 'Torta' : recipe.type === 'reposteria' ? 'Repostería' : recipe.type === 'personalizados' ? 'Personalizados' : recipe.type}</span></p>
                 <p className="font-semibold text-gray-700 mb-2">Ingredientes:</p>
                 <ul className="list-disc list-inside text-gray-600 text-sm mb-4">
                   {recipe.ingredients.map((ing, idx) => (
@@ -1115,14 +1119,12 @@ const SalesNote = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
-  // Product type options for sales note
+  // Product type options for sales note (se quitó 'pie' y 'other')
   const salesNoteTypeOptions = [
     { value: 'cake', label: 'Torta 🎂' },
     { value: 'cookie', label: 'Galleta 🍪' },
-    { value: 'pie', label: 'Pie 🥧' },
     { value: 'reposteria', label: 'Repostería 🧁' },
-    { value: 'personalizados', label: 'Personalizados ✨' },
-    { value: 'other', label: 'Otro ✨' }
+    { value: 'personalizados', label: 'Personalizados ✨' }
   ];
 
   useEffect(() => {
@@ -1248,7 +1250,7 @@ const SalesNote = () => {
       }
 
       if (!window.confirm(`¿Confirmas que el pedido de "${productDescription}" por ${quantity} unidades está ${newStatus}? Esto deducirá del inventario de productos terminados.`)) {
-        return; // Usuario cancela
+        return; 
       }
 
       try {
