@@ -314,7 +314,7 @@ const Dashboard = () => {
 
   return (
     <div className="bg-white p-8 rounded-3xl shadow-2xl border border-pink-100">
-      <h2 className="text-4xl font-extrabold text-pink-800 mb-8 text-center">RPM de Cookies and Cakes</h2>
+      <h2 className="text-4xl font-extrabold text-pink-800 mb-8 text-center">MRP de Cookies and Cakes</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <StatCard title="Total Recetas" value={recipesCount} icon="📝" bgColor="bg-pink-300" textColor="text-pink-900" />
         <StatCard title="Items en Inventario" value={inventoryCount} icon="📦" bgColor="bg-rose-200" textColor="text-rose-900" />
