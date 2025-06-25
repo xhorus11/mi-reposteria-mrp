@@ -20,36 +20,51 @@ import {
 // Contexto para Firebase y usuario autenticado
 const FirebaseContext = createContext(null);
 
-// Utility for unit conversion
+// Utility for unit conversion (Ahora más robusto para todas las conversiones solicitadas)
 const convertUnits = (value, fromUnit, toUnit) => {
-  const unitMap = {
-    'g': 1, 'ml': 1, // Base units
-    'unidad': 1, // Treat as base for now, can be customized later
-    'kg': 1000, // 1 kg = 1000 g
-    'lt': 1000  // 1 lt = 1000 ml
-  };
+  const standardizedFromUnit = fromUnit.toLowerCase();
+  const standardizedToUnit = toUnit.toLowerCase();
 
-  if (fromUnit === toUnit) {
+  if (standardizedFromUnit === standardizedToUnit) {
     return value;
   }
 
-  // Handle incompatible types (e.g., g to lt directly)
-  const isMass = ['g', 'kg'].includes(fromUnit) && ['g', 'kg'].includes(toUnit);
-  const isVolume = ['ml', 'lt'].includes(fromUnit) && ['ml', 'lt'].includes(toUnit);
-  const isCount = ['unidad'].includes(fromUnit) && ['unidad'].includes(toUnit); 
+  // Conversion factors to a common base (gram for mass, cubic centimeter for volume)
+  // 1 ml = 1 cc
+  const conversionFactors = {
+      'mass': {
+          'g': 1,
+          'kg': 1000
+      },
+      'volume': {
+          'ml': 1,
+          'lt': 1000,
+          'cc': 1 
+      },
+      'count': {
+          'unidad': 1
+      }
+  };
 
-  if (!isMass && !isVolume && !isCount) {
-    console.warn(`Attempting incompatible unit conversion: ${fromUnit} to ${toUnit}`);
-    return null; // Or throw error
+  let fromCategory = '';
+  if (conversionFactors.mass[standardizedFromUnit]) fromCategory = 'mass';
+  else if (conversionFactors.volume[standardizedFromUnit]) fromCategory = 'volume';
+  else if (conversionFactors.count[standardizedFromUnit]) fromCategory = 'count';
+
+  let toCategory = '';
+  if (conversionFactors.mass[standardizedToUnit]) toCategory = 'mass';
+  else if (conversionFactors.volume[standardizedToUnit]) toCategory = 'volume';
+  else if (conversionFactors.count[standardizedToUnit]) toCategory = 'count';
+
+  if (fromCategory !== toCategory || fromCategory === '') {
+      console.warn(`Attempting incompatible unit conversion: ${fromUnit} (${fromCategory}) to ${toUnit} (${toCategory})`);
+      return null;
   }
 
-  if (unitMap[fromUnit] && unitMap[toUnit]) {
-    // Convert to common base (g for mass, ml for volume) then to target unit
-    return (value * unitMap[fromUnit]) / unitMap[toUnit];
-  }
+  const valueInBase = value * conversionFactors[fromCategory][standardizedFromUnit];
+  const result = valueInBase / conversionFactors[toCategory][standardizedToUnit];
 
-  console.warn(`Unknown unit in conversion: ${fromUnit} or ${toUnit}`);
-  return null;
+  return result;
 };
 
 
@@ -194,8 +209,8 @@ const App = () => {
         >
           <img
             src="/logo_cyc.jpg" // Ahora apunta a tu logo en la carpeta public
-            alt="Logo Pyme Cookies and Cakes" // Alt text actualizado
-            className="h-10 w-10 mr-2 rounded-full shadow-md" // Estilos para el logo
+            alt="Logo Pyme Cookies and Cake" // Puedes hacer el alt más descriptivo
+            className="h-10 w-10 mr-2 rounded-full shadow-md" // Puedes ajustar el tamaño o estilo aquí
           />
           Cookies and Cakes
         </button>
@@ -205,6 +220,7 @@ const App = () => {
               <NavLink label="Inventario" page="inventory" setCurrentPage={setCurrentPage} />
               <NavLink label="Recetas" page="recipes" setCurrentPage={setCurrentPage} />
               <NavLink label="Nota de Venta" page="sales_note" setCurrentPage={setCurrentPage} />
+              <NavLink label="Conversor de Unidades" page="converter" setCurrentPage={setCurrentPage} /> {/* Nuevo NavLink */}
               <button
                 onClick={handleSignOut}
                 className="px-4 py-2 rounded-xl bg-pink-700 text-white font-semibold hover:bg-pink-800 transition duration-300 transform hover:scale-105 shadow-md flex items-center"
@@ -263,6 +279,8 @@ const App = () => {
         return <Recipes />;
       case 'sales_note':
         return <SalesNote />;
+      case 'converter':
+        return <UnitConverterPage />; // Nueva página para el conversor
       default:
         return <Dashboard />;
     }
@@ -314,7 +332,7 @@ const Dashboard = () => {
 
   return (
     <div className="bg-white p-8 rounded-3xl shadow-2xl border border-pink-100">
-      <h2 className="text-4xl font-extrabold text-pink-800 mb-8 text-center">MRP de Cookies and Cakes</h2>
+      <h2 className="text-4xl font-extrabold text-pink-800 mb-8 text-center">Resumen de Cookies and Cakes</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <StatCard title="Total Recetas" value={recipesCount} icon="📝" bgColor="bg-pink-300" textColor="text-pink-900" />
         <StatCard title="Items en Inventario" value={inventoryCount} icon="📦" bgColor="bg-rose-200" textColor="text-rose-900" />
@@ -340,14 +358,14 @@ const Inventory = () => {
   const [items, setItems] = useState([]);
   const [newItemName, setNewItemName] = useState('');
   const [newItemUnitValue, setNewItemUnitValue] = useState(''); // Cantidad de la unidad (ej. 100 para 100g)
-  const [newItemUnitType, setNewItemUnitType] = useState('g'); // Tipo de unidad (ej. g, kg)
+  const [newItemUnitType, setNewItemUnitType] = useState('g'); // Tipo de unidad (ej. g, cc)
   const [newItemStock, setNewItemStock] = useState(''); // Stock total (número de estas unidades)
   const [editingItemId, setEditingItemId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
-  // Opciones de unidades (se quitó 'porción')
-  const unitOptions = ['g', 'kg', 'lt', 'ml', 'unidad'];
+  // Opciones de unidades: g, cc, unidad (kg, lt, ml eliminadas de aquí)
+  const unitOptions = ['g', 'cc', 'unidad'];
 
   useEffect(() => {
     if (!db || !userId) return;
@@ -671,9 +689,9 @@ const Recipes = () => {
   const [modalMessage, setModalMessage] = useState('');
   const [productionQuantity, setProductionQuantity] = useState(1); // Cantidad a producir de una receta
 
-  // Opciones de unidades (se quitó 'porción')
-  const unitOptions = ['g', 'kg', 'lt', 'ml', 'unidad'];
-  // Opciones de tipo de producto para recetas (se quitó 'pie' y 'other')
+  // Opciones de unidades: g, cc, unidad (kg, lt, ml eliminadas de aquí)
+  const unitOptions = ['g', 'cc', 'unidad'];
+  // Opciones de tipo de producto para recetas
   const recipeTypeOptions = [
     { value: 'cookie', label: 'Galleta 🍪' },
     { value: 'cake', label: 'Torta 🎂' },
@@ -848,7 +866,7 @@ const Recipes = () => {
       const requiredAmountConverted = convertUnits(
         requiredAmountRecipeBase * quantityToProduce, // Total requerido para la producción
         requiredUnitRecipe,
-        inventoryItem.unit_type // Convertir a la unidad del inventario (ej. 'g', 'kg')
+        inventoryItem.unit_type // Convertir a la unidad del inventario (ej. 'g', 'cc')
       );
 
       if (requiredAmountConverted === null) {
@@ -903,7 +921,7 @@ const Recipes = () => {
         updatedInventoryPromises.push(addDoc(inventoryRef, {
           name: recipe.name,
           unit_value: 1, // Por defecto, 1 unidad del producto terminado
-          unit_type: 'unidad', // 'porción' eliminada, se usa 'unidad'
+          unit_type: 'unidad', 
           stock: quantityToProduce,
           type: 'finished_good',
           createdAt: new Date(),
@@ -1110,16 +1128,18 @@ const SalesNote = () => {
   const { db, userId, appId } = useContext(FirebaseContext);
   const [salesOrders, setSalesOrders] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]); // Para verificar productos terminados y deducir
+  const [recipes, setRecipes] = useState([]); // Para la selección de recetas
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newOrderType, setNewOrderType] = useState('cake'); 
-  const [newProductDescription, setNewProductDescription] = useState(''); 
+  const [selectedRecipeId, setSelectedRecipeId] = useState(''); // Nuevo estado para la receta seleccionada
+  const [newProductDetails, setNewProductDetails] = useState(''); // Nuevo estado para detalles adicionales
   const [newOrderQuantity, setNewOrderQuantity] = useState('');
   const [newOrderDate, setNewOrderDate] = useState('');
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
 
-  // Product type options for sales note (se quitó 'pie' y 'other')
+  // Product type options for sales note
   const salesNoteTypeOptions = [
     { value: 'cake', label: 'Torta 🎂' },
     { value: 'cookie', label: 'Galleta 🍪' },
@@ -1147,10 +1167,18 @@ const SalesNote = () => {
       setInventoryItems(itemsData.filter(item => item.type === 'finished_good'));
     }, (error) => console.error("Error fetching finished goods for sales note:", error));
 
+    // Escucha recetas para el selector
+    const recipesRef = collection(db, `artifacts/${appId}/users/${userId}/recipes`);
+    const unsubscribeRecipes = onSnapshot(recipesRef, (snapshot) => {
+      const recipesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRecipes(recipesData.sort((a, b) => a.name.localeCompare(b.name)));
+    }, (error) => console.error("Error fetching recipes for sales note:", error));
+
 
     return () => {
       unsubscribeOrders();
       unsubscribeInventory();
+      unsubscribeRecipes();
     };
   }, [db, userId, appId]);
 
@@ -1165,8 +1193,8 @@ const SalesNote = () => {
   };
 
   const handleAddOrUpdateOrder = async () => {
-    if (!newCustomerName.trim() || !newOrderQuantity || !newOrderDate || !newProductDescription.trim()) {
-      showInfoModal('Todos los campos son obligatorios para la nota de venta.');
+    if (!newCustomerName.trim() || !newOrderQuantity || !newOrderDate || (!selectedRecipeId && !newProductDetails.trim())) {
+      showInfoModal('Por favor, selecciona una receta o introduce una descripción del producto.');
       return;
     }
     const quantity = parseInt(newOrderQuantity);
@@ -1179,7 +1207,8 @@ const SalesNote = () => {
       const orderData = {
         customerName: newCustomerName,
         orderType: newOrderType,
-        productDescription: newProductDescription,
+        selectedRecipeId: selectedRecipeId || null, // Store selected recipe ID
+        productDescription: newProductDetails, // Store additional details
         quantity: quantity,
         orderDate: newOrderDate,
         createdAt: new Date(),
@@ -1206,7 +1235,8 @@ const SalesNote = () => {
     setEditingOrderId(order.id);
     setNewCustomerName(order.customerName);
     setNewOrderType(order.orderType);
-    setNewProductDescription(order.productDescription);
+    setSelectedRecipeId(order.selectedRecipeId || '');
+    setNewProductDetails(order.productDescription || '');
     setNewOrderQuantity(order.quantity.toString());
     setNewOrderDate(order.orderDate);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1225,7 +1255,7 @@ const SalesNote = () => {
   };
 
   // Función para cambiar el estado del pedido y deducir inventario
-  const handleChangeOrderStatus = async (orderId, currentStatus, productDescription, quantity) => {
+  const handleChangeOrderStatus = async (orderId, currentStatus, selectedRecipeId, productDescription, quantity) => {
     if (!db || !userId) {
       showInfoModal('Error: No estás autenticado o la base de datos no está disponible.');
       return;
@@ -1234,22 +1264,31 @@ const SalesNote = () => {
     const newStatus = currentStatus === 'Pendiente' ? 'Completado' : 'Pendiente'; // Toggle status
 
     if (newStatus === 'Completado') {
+      // Determinar el nombre del producto para la deducción
+      let productNameForDeduction = productDescription; // Usar detalles si no hay receta
+      if (selectedRecipeId) {
+          const associatedRecipe = recipes.find(r => r.id === selectedRecipeId);
+          if (associatedRecipe) {
+              productNameForDeduction = associatedRecipe.name;
+          }
+      }
+
       // Intentar deducir del inventario de productos terminados
       const finishedProduct = inventoryItems.find(item => 
-        item.name.toLowerCase() === productDescription.toLowerCase() && item.type === 'finished_good'
+        item.name.toLowerCase() === productNameForDeduction.toLowerCase() && item.type === 'finished_good'
       );
 
       if (!finishedProduct) {
-        showInfoModal(`No se puede completar el pedido: "${productDescription}" no encontrado como producto terminado en el inventario.`);
+        showInfoModal(`No se puede completar el pedido: "${productNameForDeduction}" no encontrado como producto terminado en el inventario.`);
         return;
       }
-      // Assuming finished goods are tracked as single 'unidad' or 'porción' (unit_value = 1)
+      // Assuming finished goods are tracked as single 'unidad' (unit_value = 1)
       if (finishedProduct.stock < quantity) {
-        showInfoModal(`No se puede completar el pedido de "${productDescription}": Stock insuficiente. Solo tienes ${finishedProduct.stock} ${finishedProduct.unit_type}(es), necesitas ${quantity}.`);
+        showInfoModal(`No se puede completar el pedido de "${productNameForDeduction}": Stock insuficiente. Solo tienes ${finishedProduct.stock} ${finishedProduct.unit_type}(es), necesitas ${quantity}.`);
         return;
       }
 
-      if (!window.confirm(`¿Confirmas que el pedido de "${productDescription}" por ${quantity} unidades está ${newStatus}? Esto deducirá del inventario de productos terminados.`)) {
+      if (!window.confirm(`¿Confirmas que el pedido de "${productNameForDeduction}" por ${quantity} unidades está ${newStatus}? Esto deducirá del inventario de productos terminados.`)) {
         return; 
       }
 
@@ -1262,7 +1301,7 @@ const SalesNote = () => {
         // Actualizar estado del pedido
         const orderRef = doc(db, `artifacts/${appId}/users/${userId}/sales_orders`, orderId);
         await updateDoc(orderRef, { status: newStatus });
-        showInfoModal(`Pedido de "${productDescription}" actualizado a "${newStatus}"! Inventario deducido.`);
+        showInfoModal(`Pedido de "${productNameForDeduction}" actualizado a "${newStatus}"! Inventario deducido.`);
 
       } catch (e) {
         console.error("Error al cambiar el estado del pedido o deducir inventario:", e);
@@ -1276,7 +1315,7 @@ const SalesNote = () => {
         try {
           const orderRef = doc(db, `artifacts/${appId}/users/${userId}/sales_orders`, orderId);
           await updateDoc(orderRef, { status: newStatus });
-          showInfoModal(`Pedido de "${productDescription}" actualizado a "${newStatus}".`);
+          showInfoModal(`Pedido de "${selectedRecipeId ? recipes.find(r => r.id === selectedRecipeId)?.name : productDescription}" actualizado a "${newStatus}".`);
         } catch (e) {
           console.error("Error al cambiar el estado del pedido:", e);
           showInfoModal('Error al actualizar el estado del pedido. Por favor, revisa la consola.');
@@ -1289,7 +1328,8 @@ const SalesNote = () => {
     setEditingOrderId(null);
     setNewCustomerName('');
     setNewOrderType('cake');
-    setNewProductDescription('');
+    setSelectedRecipeId('');
+    setNewProductDetails('');
     setNewOrderQuantity('');
     setNewOrderDate('');
   };
@@ -1326,16 +1366,31 @@ const SalesNote = () => {
               ))}
             </select>
           </div>
-          <div className="md:col-span-2">
-            <label htmlFor="productDescription" className="block text-gray-700 text-sm font-semibold mb-2">Descripción del Producto / Detalles</label>
-            <input
-              type="text"
-              id="productDescription"
+          {/* Nueva sección para seleccionar receta y detalles */}
+          <div>
+            <label htmlFor="recipeSelect" className="block text-gray-700 text-sm font-semibold mb-2">Receta Asociada (Opcional)</label>
+            <select
+              id="recipeSelect"
               className="w-full p-3 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400"
-              value={newProductDescription}
-              onChange={(e) => setNewProductDescription(e.target.value)}
-              placeholder="Ej: Torta de chocolate 10 porciones, Galletas de avena con pasas, Diseño especial de unicornio"
-            />
+              value={selectedRecipeId}
+              onChange={(e) => setSelectedRecipeId(e.target.value)}
+            >
+              <option value="">-- Seleccionar Receta --</option>
+              {recipes.map(recipe => (
+                <option key={recipe.id} value={recipe.id}>{recipe.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="productDetails" className="block text-gray-700 text-sm font-semibold mb-2">Detalles del Producto / Descripción</label>
+            <textarea
+              id="productDetails"
+              className="w-full p-3 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400"
+              value={newProductDetails}
+              onChange={(e) => setNewProductDetails(e.target.value)}
+              placeholder="Ej: Torta de chocolate 10 porciones, diseño especial de unicornio"
+              rows="3"
+            ></textarea>
           </div>
           <div>
             <label htmlFor="orderQuantity" className="block text-gray-700 text-sm font-semibold mb-2">Cantidad</label>
@@ -1386,7 +1441,8 @@ const SalesNote = () => {
             <thead className="bg-pink-100 border-b border-pink-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-bold text-pink-700 uppercase tracking-wider">Cliente</th>
-                <th className="px-6 py-3 text-left text-xs font-bold text-pink-700 uppercase tracking-wider">Producto</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-pink-700 uppercase tracking-wider">Receta Asociada</th> {/* Nueva columna */}
+                <th className="px-6 py-3 text-left text-xs font-bold text-pink-700 uppercase tracking-wider">Detalles del Producto</th> {/* Nueva columna */}
                 <th className="px-6 py-3 text-left text-xs font-bold text-pink-700 uppercase tracking-wider">Tipo</th>
                 <th className="px-6 py-3 text-left text-xs font-bold text-pink-700 uppercase tracking-wider">Cantidad</th>
                 <th className="px-6 py-3 text-left text-xs font-bold text-pink-700 uppercase tracking-wider">Fecha</th>
@@ -1398,13 +1454,16 @@ const SalesNote = () => {
               {salesOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-pink-50 transition duration-150 ease-in-out">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.customerName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {order.selectedRecipeId ? recipes.find(r => r.id === order.selectedRecipeId)?.name : 'N/A'}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.productDescription}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 capitalize">{order.orderType}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{order.orderDate}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
                     <button
-                      onClick={() => handleChangeOrderStatus(order.id, order.status, order.productDescription, order.quantity)}
+                      onClick={() => handleChangeOrderStatus(order.id, order.status, order.selectedRecipeId, order.productDescription, order.quantity)}
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                         ${order.status === 'Pendiente' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
                           order.status === 'Completado' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
@@ -1443,6 +1502,111 @@ const SalesNote = () => {
     </div>
   );
 };
+
+// Componente Conversor de Unidades (Nueva Página)
+const UnitConverterPage = () => {
+  const [value, setValue] = useState(1);
+  const [fromUnit, setFromUnit] = useState('g');
+  const [toUnit, setToUnit] = useState('g');
+  const [result, setResult] = useState('Resultado: ');
+  const [showModal, setShowModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+
+  // Opciones de unidades para el conversor (incluye todas las posibles)
+  const converterUnitOptions = ['g', 'kg', 'ml', 'lt', 'cc', 'unidad'];
+
+  const showInfoModal = (message) => {
+    setModalMessage(message);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setModalMessage('');
+  };
+
+  const handleConvert = () => {
+    const numericValue = parseFloat(value);
+    if (isNaN(numericValue) || numericValue < 0) {
+      showInfoModal('Por favor, ingresa un valor numérico positivo.');
+      setResult('Resultado: Valor inválido');
+      return;
+    }
+
+    const converted = convertUnits(numericValue, fromUnit, toUnit);
+
+    if (converted !== null) {
+      setResult(`Resultado: ${converted.toFixed(2)} ${toUnit}`);
+    } else {
+      setResult('Resultado: Conversión no compatible');
+      showInfoModal('Las unidades seleccionadas no son compatibles para conversión (ej. no se puede convertir gramos a litros).');
+    }
+  };
+
+  return (
+    <div className="bg-white p-8 rounded-3xl shadow-2xl border border-pink-100">
+      <h2 className="text-3xl font-extrabold text-pink-800 mb-6 text-center">Conversor de Unidades 🔄</h2>
+      <p className="text-center text-gray-600 mb-8">
+        Convierte fácilmente entre diferentes unidades de medida (gramos, kilogramos, mililitros, litros y centímetros cúbicos).
+      </p>
+
+      <div className="max-w-md mx-auto p-6 bg-cyan-50 rounded-2xl shadow-md border border-cyan-100 space-y-4">
+        <div>
+          <label htmlFor="convert-value" className="block text-sm font-medium text-slate-700 mb-2">Valor a Convertir:</label>
+          <input
+            type="number"
+            id="convert-value"
+            value={value}
+            onChange={(e) => setValue(parseFloat(e.target.value) || 0)}
+            min="0"
+            className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-center text-lg"
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <div className="flex-1 w-full">
+            <label htmlFor="from-unit" className="block text-sm font-medium text-slate-700 mb-2">De Unidad:</label>
+            <select
+              id="from-unit"
+              className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              value={fromUnit}
+              onChange={(e) => setFromUnit(e.target.value)}
+            >
+              {converterUnitOptions.map(unit => (
+                <option key={unit} value={unit}>{unit.toUpperCase()}</option>
+              ))}
+            </select>
+          </div>
+          <div className="text-2xl text-slate-600 sm:mt-6">→</div>
+          <div className="flex-1 w-full">
+            <label htmlFor="to-unit" className="block text-sm font-medium text-slate-700 mb-2">A Unidad:</label>
+            <select
+              id="to-unit"
+              className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              value={toUnit}
+              onChange={(e) => setToUnit(e.target.value)}
+            >
+              {converterUnitOptions.map(unit => (
+                <option key={unit} value={unit}>{unit.toUpperCase()}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <button
+          onClick={handleConvert}
+          // Modificaciones aquí para hacer el botón más visible
+          className="px-8 py-4 bg-pink-600 text-white font-bold text-lg rounded-xl hover:bg-pink-700 transition duration-300 transform hover:scale-105 shadow-xl w-full mt-4"
+        >
+          Convertir
+        </button>
+        <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200 text-center">
+          <span className="text-xl font-bold text-cyan-700" id="conversion-result">{result}</span>
+        </div>
+      </div>
+      {showModal && <InfoModal message={modalMessage} onClose={closeModal} />}
+    </div>
+  );
+};
+
 
 // Componente Modal de Información (Reutilizable)
 const InfoModal = ({ message, onClose }) => {
